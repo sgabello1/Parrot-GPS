@@ -1,0 +1,76 @@
+#include <ros/ros.h>
+#include <ros/types.h>
+#include <std_msgs/Header.h>
+#include <ardrone_autonomy/navdata_gps_channel.h>
+#include <gps_communication/conversions.h>
+#include "std_msgs/String.h"
+#include "ardrone_autonomy/navdata_gps.h"
+#include "gps_communication/Coordinate_utm.h"
+#include <iomanip>
+#include <stdio.h>
+
+
+double y_s, x_s;
+double y_f, x_f;
+std::string zone;
+int number=1, partenza=1;
+
+
+void StartingPosition (const gps_communication::Coordinate_utm& msg)
+	{
+	printf ("initial UTM: (%lf) to (%lf) \n",msg.northing, msg.easting);
+	y_s=msg.northing;
+	x_s=msg.easting;
+	}
+
+
+void FinalPosition (const gps_communication::Coordinate_utm& msg)
+	{
+	printf ("equation from way_points: (%d) to (%d) \n",number-1,number);
+	y_f=msg.northing;
+	x_f=msg.easting;
+	}
+
+
+
+int main(int argc, char **argv)
+	{
+	double m, q;
+
+  	ros::init(argc, argv, "equation");
+  	ros::NodeHandle n1_sub;
+	ros::NodeHandle n2_sub;
+    ros::NodeHandle n_pub;	
+	
+	while (ros::ok())
+    	{	
+		if(partenza==1)	//all'inizio le coordinate di partenza sono quelle date dal gps
+			{
+			printf ("equation from initial position to the way_point number: (1)\n");
+	  		ros::Subscriber sub = n1_sub.subscribe("UTM_4LINE", 1000, StartingPosition);
+			partenza=0;		
+			}
+		else	//raggiunto il primo waypoint, le coordinate finali diventano coordinate iniziali
+			{
+			y_s=y_f;
+			x_s=x_f;		
+			}
+		number++;	
+		ros::Subscriber sub = n2_sub.subscribe("UTM_4LINE_WAYPOINTS", 1000, FinalPosition);
+		
+		std::sleep(1);
+
+		m=(y_f-y_s)/(x_f-x_s);
+		q=(y_s*x_f-y_f*x_s)/(x_f-x_s);
+		ROS_INFO("eqation: y= (%lf)x + (%lf)",m, q);
+		//fare poi un publisher
+
+		printf ("waiting for a new valid way point\npress a button to proceede\n");
+		std::cin.get();
+		std::cin.ignore();
+
+		ros::spinOnce();
+		}
+	
+  	return 0;
+	}

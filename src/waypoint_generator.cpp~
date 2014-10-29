@@ -1,0 +1,79 @@
+#include "ros/ros.h"
+#include <fstream>
+#include <sstream>
+#include <iostream>
+#include <string>
+#include "std_msgs/String.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <gps_communication/conversions.h>
+#include "gps_communication/Coordinate_utm.h"
+
+
+void readDATA()
+	{
+	bool latch=true;
+	int i,number=1;
+	double northing, easting, latitude, longitude;
+	std::ifstream myFile;
+	std::string line, zone;
+	ros::NodeHandle n_pub;	
+	gps_communication::Coordinate_utm mess;
+		
+  	ros::Publisher pub=n_pub.advertise<gps_communication::Coordinate_utm>("UTM_4LINE_WAYPOINTS", 1000, latch);
+		
+	myFile.open("/home/stefano/catkin_ws/src/gps_communication/src/points.txt", std::ios::app); 
+	
+	if (myFile.is_open())
+		{
+		std::cout << "File is open."<<std::endl;
+		while (myFile.good())
+			{
+			for (int i=0; i <5; i++)
+				{
+				std::getline(myFile,line);
+				std::size_t pos = line.find(':');      // position of ":" in line
+  				std::string str = line.substr(pos+1);
+				std::stringstream ss(str);
+				if(i==0)
+					{					
+					ss >> latitude;
+					}
+				if(i==1)
+					{					
+					ss >> longitude;
+					printf ("WAY_POINT number(%d)  latitude-> %lf  longitude-> %lf\n",number,latitude,longitude);
+					gps_common::LLtoUTM(latitude, longitude, northing, easting, zone);
+					ROS_INFO("Northing=(%lf) Easting=(%lf) Zone=(%s)",northing, easting,zone.c_str());
+					
+					while (ros::ok())
+    				{
+					mess.northing=(float)northing;	
+					mess.easting=(float)easting;
+					pub.publish(mess);	
+					ros::Rate loop_rate(10);
+					ros::spinOnce();
+					}
+
+					
+					printf ("press a button\n");
+					std::cin.get();
+					std::cin.ignore();
+					number++;
+					}
+				}
+			}
+		myFile.close();
+		}
+
+	else std::cout << "Unable to open the file"; 
+	}
+
+
+
+int main(int argc, char **argv)
+	{
+	ros::init(argc, argv, "waypoints_generator");
+	readDATA();
+	return 0;
+	}
